@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>我的待办清单</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="card header-card">
+        <h1 class="title">
+          <span class="title-icon" aria-hidden="true">📝</span>我的待办清单
+        </h1>
+        <p class="subtitle">输入任务，勾选完成，刷新页面也不会丢。</p>
+
+        <div class="stats" aria-live="polite">
+          <div class="stat">
+            <span class="stat-label">未完成</span>
+            <span id="activeCount" class="stat-value">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">已完成</span>
+            <span id="completedCount" class="stat-value">0</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card input-card">
+        <form id="addForm" class="add-form">
+          <label class="sr-only" for="taskInput">输入任务内容</label>
+          <input
+            id="taskInput"
+            class="text-input"
+            type="text"
+            placeholder="今天要做什么？"
+            autocomplete="off"
+            maxlength="200"
+          />
+          <label class="sr-only" for="prioritySelect">选择任务优先级</label>
+          <select id="prioritySelect" class="priority-select" aria-label="选择任务优先级">
+            <option value="high">高</option>
+            <option value="medium" selected>中</option>
+            <option value="low">低</option>
+          </select>
+          <button id="addBtn" class="btn btn-primary" type="submit">➕ 添加任务</button>
+        </form>
+
+        <div class="actions">
+          <button
+            id="clearCompletedBtn"
+            class="btn btn-secondary"
+            type="button"
+            disabled
+          >
+            清空已完成
+          </button>
+          <button
+            id="clearAllBtn"
+            class="btn btn-danger"
+            type="button"
+            disabled
+          >
+            全部清空
+          </button>
+        </div>
+      </section>
+
+      <section class="card list-card">
+        <ul id="todoList" class="todo-list" aria-label="待办列表"></ul>
+        <div id="emptyState" class="empty-state" hidden>还没有任务，给今天加点计划吧！</div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
