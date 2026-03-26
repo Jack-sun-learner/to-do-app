@@ -1,0 +1,19 @@
+{
+  "tasks": [
+    {
+      "text": "完成项目周报",
+      "priority": "high",
+      "completed": false
+    },
+    {
+      "title": "预订周五会议室",
+      "priority": "medium",
+      "completed": false
+    },
+    {
+      "name": "整理发票",
+      "priority": "low",
+      "completed": "false"
+    }
+  ]
+}

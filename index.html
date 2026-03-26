@@ -66,13 +66,74 @@
         </div>
       </section>
 
+      <section class="card import-card">
+        <div class="import-copy">
+          <h2 class="section-title">URL 导入</h2>
+          <p class="section-subtitle">输入一个返回 JSON 的地址，把远程 to-do 批量加入当前清单。</p>
+        </div>
+        <form id="importForm" class="import-form">
+          <label class="sr-only" for="importUrlInput">输入 to-do 列表 URL</label>
+          <input
+            id="importUrlInput"
+            class="text-input"
+            type="url"
+            placeholder="https://example.com/todos.json"
+            inputmode="url"
+            autocomplete="off"
+          />
+          <button id="importBtn" class="btn btn-primary" type="submit">导入 URL 任务</button>
+        </form>
+        <p id="importStatus" class="import-status" aria-live="polite"></p>
+      </section>
+
       <section class="card list-card">
         <ul id="todoList" class="todo-list" aria-label="待办列表"></ul>
         <div id="emptyState" class="empty-state" hidden>还没有任务，给今天加点计划吧！</div>
       </section>
     </main>
 
+    <aside class="floating-dock">
+      <button
+        id="floatingToggle"
+        class="floating-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="floatingPanel"
+      >
+        <span class="floating-toggle-label">未完成任务</span>
+        <span id="floatingCount" class="floating-toggle-count">0</span>
+      </button>
+
+      <section
+        id="floatingPanel"
+        class="floating-panel"
+        aria-label="未完成任务悬浮窗口"
+        hidden
+      >
+        <div class="floating-panel-header">
+          <div>
+            <p class="floating-panel-kicker">悬浮提醒</p>
+            <h2 class="floating-panel-title">按优先级排序</h2>
+            <p id="floatingPanelSummary" class="floating-panel-summary">优先展示最紧急的待办。</p>
+          </div>
+          <button id="floatingCloseBtn" class="floating-close-btn" type="button" aria-label="关闭悬浮窗口">
+            关闭
+          </button>
+        </div>
+        <div id="floatingPriorityStats" class="floating-priority-stats" aria-label="未完成任务优先级统计">
+          <span id="floatingHighCount" class="floating-priority-pill priority-high">高 0</span>
+          <span id="floatingMediumCount" class="floating-priority-pill priority-medium">中 0</span>
+          <span id="floatingLowCount" class="floating-priority-pill priority-low">低 0</span>
+        </div>
+        <ul id="floatingTodoList" class="floating-todo-list" aria-live="polite"></ul>
+        <p id="floatingEmptyState" class="floating-empty-state" hidden>当前没有未完成任务。</p>
+        <div id="floatingPanelFooter" class="floating-panel-footer" hidden>
+          <span id="floatingMoreHint" class="floating-more-hint"></span>
+          <button id="floatingExpandBtn" class="floating-expand-btn" type="button">展开全部</button>
+        </div>
+      </section>
+    </aside>
+
     <script src="./app.js"></script>
   </body>
 </html>
-
