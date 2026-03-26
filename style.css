@@ -123,6 +123,25 @@ body {
   align-items: center;
 }
 
+.import-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: linear-gradient(90deg, rgba(47, 128, 237, 0.08), rgba(47, 128, 237, 0.22), rgba(47, 128, 237, 0.08));
+}
+
+.sync-actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sync-meta {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .priority-select {
   height: 44px;
   border-radius: 14px;
@@ -670,6 +689,11 @@ body {
   }
 
   .import-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sync-actions {
     flex-direction: column;
     align-items: stretch;
   }

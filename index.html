@@ -84,6 +84,21 @@
           <button id="importBtn" class="btn btn-primary" type="submit">导入 URL 任务</button>
         </form>
         <p id="importStatus" class="import-status" aria-live="polite"></p>
+
+        <div class="import-divider" aria-hidden="true"></div>
+
+        <div class="import-copy">
+          <h2 class="section-title">Reminders 自动同步</h2>
+          <p class="section-subtitle">
+            自动读取本机导出的 <code>reminders-export.json</code>，页面打开时会同步一次，并在每天 07:00
+            附近再检查更新。
+          </p>
+        </div>
+        <div class="sync-actions">
+          <button id="syncRemindersBtn" class="btn btn-secondary" type="button">同步提醒事项</button>
+          <span id="remindersSyncMeta" class="sync-meta">等待首次同步</span>
+        </div>
+        <p id="remindersSyncStatus" class="import-status" aria-live="polite"></p>
       </section>
 
       <section class="card list-card">

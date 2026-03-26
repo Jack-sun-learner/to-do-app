@@ -19,6 +19,9 @@ A small, browser-based to-do list app with persistent tasks and a clean UI.
 - Click-outside / Escape support to quickly dismiss the floating panel
 - Import remote to-do items from a JSON URL
 - Import support for common task shapes such as `text`, `title`, `name`, `task`, and `content`
+- macOS Reminders sync via a local `reminders-export.json` bridge
+- Daily Reminders export at **07:00** through LaunchAgents
+- Local auto-sync button for reading the latest Reminders export into the app
 - Friendly empty state when there are no tasks
 - Tasks are saved in `localStorage`, so refreshing the page won’t lose your list
 
@@ -49,6 +52,35 @@ A sample import source is included in [sample-todos.json](./sample-todos.json).
 If you run the project locally with a static server, you can test URL import with:
 
 `http://127.0.0.1:4173/sample-todos.json`
+
+## Reminders automation
+
+This project can sync with macOS Reminders, which also covers iPhone reminders when both devices use the same iCloud account.
+
+How it works:
+
+- `scripts/export_reminders.py` reads macOS Reminders and writes `reminders-export.json`
+- the app reads `reminders-export.json` from the local server and merges reminders into the task list
+- reminder-based tasks are updated by external ID, so repeat syncs do not keep duplicating items
+- two LaunchAgents can be installed to keep a local server running and export Reminders every day at **07:00**
+
+Related scripts:
+
+- `scripts/install_reminders_sync.sh`
+- `scripts/uninstall_reminders_sync.sh`
+- `scripts/export_reminders.py`
+
+After installation:
+
+- open the app locally at `http://127.0.0.1:4173`
+- the page will try to sync `reminders-export.json` on load
+- you can also click the built-in Reminders sync button for an immediate refresh
+
+Important:
+
+- the first run may trigger macOS Automation permissions for Reminders
+- `reminders-export.json` contains personal reminder data and is ignored by git
+- GitHub Pages cannot directly access your local Reminders data; this automation is for local use on your Mac
 
 ## Note
 

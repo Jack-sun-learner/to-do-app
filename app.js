@@ -3,6 +3,9 @@
   const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
   const IMPORT_SOURCE_KEYS = ["tasks", "todos", "items", "data", "results"];
   const IMPORT_BUTTON_LABEL = "导入 URL 任务";
+  const REMINDERS_EXPORT_URL = "./reminders-export.json";
+  const REMINDERS_SYNC_BUTTON_LABEL = "同步提醒事项";
+  const REMINDERS_SYNC_HOUR = 7;
   const FLOATING_PREVIEW_LIMIT = 5;
 
   const els = {
@@ -19,6 +22,9 @@
     importUrlInput: document.getElementById("importUrlInput"),
     importBtn: document.getElementById("importBtn"),
     importStatus: document.getElementById("importStatus"),
+    syncRemindersBtn: document.getElementById("syncRemindersBtn"),
+    remindersSyncMeta: document.getElementById("remindersSyncMeta"),
+    remindersSyncStatus: document.getElementById("remindersSyncStatus"),
     floatingDock: document.querySelector(".floating-dock"),
     floatingToggle: document.getElementById("floatingToggle"),
     floatingCount: document.getElementById("floatingCount"),
@@ -36,10 +42,12 @@
     floatingCloseBtn: document.getElementById("floatingCloseBtn"),
   };
 
-  /** @type {{id:string,text:string,priority:"high"|"medium"|"low",completed:boolean,createdAt:number}[]} */
+  /** @type {{id:string,text:string,priority:"high"|"medium"|"low",completed:boolean,createdAt:number,source?:"manual"|"reminders",externalId?:string,sourceList?:string,note?:string,dueDate?:string,updatedAt?:number}[]} */
   let tasks = [];
   let floatingPanelPinned = false;
   let floatingShowAll = false;
+  let remindersAutoSyncTimerId = 0;
+  let lastRemindersExportGeneratedAt = "";
 
   /** @param {unknown} p */
   function normalizePriority(p) {
@@ -75,6 +83,31 @@
     return `t_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   }
 
+  /** @param {any} raw */
+  function normalizeTaskRecord(raw) {
+    const now = Date.now();
+    const hasExternalId = raw && typeof raw.externalId === "string" && raw.externalId.trim();
+    return {
+      id: raw && typeof raw.id === "string" ? raw.id : uid(),
+      text: raw && typeof raw.text === "string" ? raw.text : "",
+      priority: normalizePriority(raw && raw.priority),
+      completed: normalizeCompleted(raw && raw.completed),
+      createdAt:
+        raw && typeof raw.createdAt === "number" && Number.isFinite(raw.createdAt)
+          ? raw.createdAt
+          : now,
+      source: hasExternalId || (raw && raw.source === "reminders") ? "reminders" : "manual",
+      externalId: hasExternalId ? raw.externalId.trim() : "",
+      sourceList: raw && typeof raw.sourceList === "string" ? raw.sourceList : "",
+      note: raw && typeof raw.note === "string" ? raw.note : "",
+      dueDate: raw && typeof raw.dueDate === "string" ? raw.dueDate : "",
+      updatedAt:
+        raw && typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt)
+          ? raw.updatedAt
+          : now,
+    };
+  }
+
   function loadTasks() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -83,13 +116,7 @@
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((x) => x && typeof x.id === "string" && typeof x.text === "string")
-        .map((x) => ({
-          id: x.id,
-          text: x.text,
-          priority: normalizePriority(x.priority),
-          completed: Boolean(x.completed),
-          createdAt: typeof x.createdAt === "number" ? x.createdAt : Date.now(),
-        }));
+        .map((x) => normalizeTaskRecord(x));
     } catch {
       return [];
     }
@@ -141,6 +168,54 @@
     if (els.importUrlInput) {
       els.importUrlInput.disabled = isLoading;
     }
+  }
+
+  function setRemindersSyncStatus(message, tone = "") {
+    if (!els.remindersSyncStatus) return;
+    els.remindersSyncStatus.textContent = message;
+    if (tone) {
+      els.remindersSyncStatus.dataset.tone = tone;
+      return;
+    }
+    delete els.remindersSyncStatus.dataset.tone;
+  }
+
+  function setRemindersSyncLoading(isLoading) {
+    if (!els.syncRemindersBtn) return;
+    els.syncRemindersBtn.disabled = isLoading;
+    els.syncRemindersBtn.textContent = isLoading ? "同步中..." : REMINDERS_SYNC_BUTTON_LABEL;
+  }
+
+  function formatDisplayDate(value) {
+    if (!value) return "";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("zh-CN", {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  }
+
+  function getNextRemindersSyncDate() {
+    const next = new Date();
+    next.setHours(REMINDERS_SYNC_HOUR, 0, 0, 0);
+    if (next.getTime() <= Date.now()) {
+      next.setDate(next.getDate() + 1);
+    }
+    return next;
+  }
+
+  function updateRemindersSyncMeta() {
+    if (!els.remindersSyncMeta) return;
+    const nextCheckLabel = formatDisplayDate(getNextRemindersSyncDate());
+    if (lastRemindersExportGeneratedAt) {
+      const lastLabel = formatDisplayDate(lastRemindersExportGeneratedAt);
+      els.remindersSyncMeta.textContent = `上次导出 ${lastLabel} · 下次检查 ${nextCheckLabel}`;
+      return;
+    }
+    els.remindersSyncMeta.textContent = `等待首次同步 · 下次检查 ${nextCheckLabel}`;
   }
 
   /** @param {unknown} value */
@@ -333,6 +408,12 @@
         priority,
         completed: false,
         createdAt: Date.now(),
+        source: "manual",
+        externalId: "",
+        sourceList: "",
+        note: "",
+        dueDate: "",
+        updatedAt: Date.now(),
       },
     ];
     saveTasks(next);
@@ -484,6 +565,20 @@
       priority: normalizePriority(prioritySource),
       completed: normalizeCompleted(completedSource),
       createdAt: Date.now() + index,
+      source: item && typeof item === "object" && item.source === "reminders" ? "reminders" : "manual",
+      externalId:
+        item && typeof item === "object" && typeof item.externalId === "string"
+          ? item.externalId
+          : "",
+      sourceList:
+        item && typeof item === "object" && typeof item.sourceList === "string"
+          ? item.sourceList
+          : "",
+      note:
+        item && typeof item === "object" && typeof item.note === "string" ? item.note : "",
+      dueDate:
+        item && typeof item === "object" && typeof item.dueDate === "string" ? item.dueDate : "",
+      updatedAt: Date.now() + index,
     };
   }
 
@@ -492,6 +587,162 @@
     return importItems
       .map((item, index) => normalizeImportedTask(item, index))
       .filter((task) => task !== null);
+  }
+
+  function isRemindersExportPayload(payload) {
+    return Boolean(
+      payload &&
+        typeof payload === "object" &&
+        Array.isArray(payload.tasks) &&
+        (payload.source === "reminders" || payload.kind === "reminders-export")
+    );
+  }
+
+  function normalizeRemindersTask(item, index) {
+    if (!item || typeof item !== "object") return null;
+    const text = getImportText(item);
+    const externalId =
+      typeof item.externalId === "string"
+        ? item.externalId
+        : typeof item.id === "string"
+          ? item.id
+          : "";
+
+    if (!text || !externalId) return null;
+
+    return normalizeTaskRecord({
+      id: uid(),
+      text,
+      priority: item.priority,
+      completed: item.completed,
+      createdAt:
+        typeof item.createdAt === "number" && Number.isFinite(item.createdAt)
+          ? item.createdAt
+          : Date.now() + index,
+      source: "reminders",
+      externalId,
+      sourceList:
+        typeof item.sourceList === "string"
+          ? item.sourceList
+          : typeof item.listName === "string"
+            ? item.listName
+            : "",
+      note:
+        typeof item.note === "string"
+          ? item.note
+          : typeof item.body === "string"
+            ? item.body
+            : "",
+      dueDate: typeof item.dueDate === "string" ? item.dueDate : "",
+      updatedAt:
+        typeof item.updatedAt === "number" && Number.isFinite(item.updatedAt)
+          ? item.updatedAt
+          : Date.now() + index,
+    });
+  }
+
+  function parseRemindersExport(payload) {
+    if (!payload || typeof payload !== "object" || !Array.isArray(payload.tasks)) {
+      throw new Error("提醒事项导出文件格式不正确。");
+    }
+
+    return {
+      generatedAt: typeof payload.generatedAt === "string" ? payload.generatedAt : "",
+      tasks: payload.tasks
+        .map((item, index) => normalizeRemindersTask(item, index))
+        .filter((task) => task !== null),
+    };
+  }
+
+  function mergeRemindersTasks(reminderTasks) {
+    const manualTasks = tasks.filter((task) => task.source !== "reminders");
+    const existingReminders = tasks.filter((task) => task.source === "reminders");
+    const existingByExternalId = new Map(
+      existingReminders
+        .filter((task) => task.externalId)
+        .map((task) => [task.externalId, task])
+    );
+
+    const nextReminders = reminderTasks.map((task) => {
+      const existing = existingByExternalId.get(task.externalId);
+      return normalizeTaskRecord({
+        ...task,
+        id: existing ? existing.id : task.id,
+        createdAt: existing ? existing.createdAt : task.createdAt,
+      });
+    });
+
+    const nextTasks = [...manualTasks, ...nextReminders].sort((a, b) => a.createdAt - b.createdAt);
+    const removedCount = Math.max(existingReminders.length - nextReminders.length, 0);
+    saveTasks(nextTasks);
+    render();
+    return {
+      syncedCount: nextReminders.length,
+      removedCount,
+    };
+  }
+
+  async function syncRemindersFromExport(options = {}) {
+    const { silent = false } = options;
+    setRemindersSyncLoading(true);
+
+    try {
+      const response = await fetch(`${REMINDERS_EXPORT_URL}?t=${Date.now()}`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          response.status === 404
+            ? "还没有找到 reminders-export.json，请先运行导出脚本。"
+            : `提醒事项同步失败（${response.status}）`
+        );
+      }
+
+      const payload = await response.json();
+      const parsed = parseRemindersExport(payload);
+      const result = mergeRemindersTasks(parsed.tasks);
+      lastRemindersExportGeneratedAt = parsed.generatedAt;
+      updateRemindersSyncMeta();
+
+      setRemindersSyncStatus(
+        result.removedCount > 0
+          ? `提醒事项已同步 ${result.syncedCount} 条，并移除了 ${result.removedCount} 条已不存在的任务。`
+          : `提醒事项已同步 ${result.syncedCount} 条。`,
+        "success"
+      );
+      return result;
+    } catch (error) {
+      updateRemindersSyncMeta();
+      if (!silent) {
+        const message =
+          error instanceof SyntaxError
+            ? "reminders-export.json 不是合法的 JSON。"
+            : error instanceof Error && error.message
+              ? error.message
+              : "提醒事项同步失败。";
+        setRemindersSyncStatus(message, "error");
+      }
+      return null;
+    } finally {
+      setRemindersSyncLoading(false);
+    }
+  }
+
+  function scheduleRemindersAutoSync() {
+    if (remindersAutoSyncTimerId) {
+      window.clearTimeout(remindersAutoSyncTimerId);
+    }
+
+    const nextCheck = getNextRemindersSyncDate();
+    const delay = Math.max(nextCheck.getTime() - Date.now(), 60 * 1000);
+    remindersAutoSyncTimerId = window.setTimeout(async () => {
+      await syncRemindersFromExport({ silent: false });
+      scheduleRemindersAutoSync();
+    }, delay);
+
+    updateRemindersSyncMeta();
   }
 
   async function importTasksFromUrl(inputUrl) {
@@ -506,6 +757,16 @@
     }
 
     const payload = await response.json();
+
+    if (isRemindersExportPayload(payload)) {
+      const parsed = parseRemindersExport(payload);
+      const result = mergeRemindersTasks(parsed.tasks);
+      lastRemindersExportGeneratedAt = parsed.generatedAt;
+      updateRemindersSyncMeta();
+      setRemindersSyncStatus(`已从 URL 同步 ${result.syncedCount} 条提醒事项。`, "success");
+      return result.syncedCount;
+    }
+
     const importedTasks = parseImportedTasks(payload);
 
     if (importedTasks.length === 0) {
@@ -568,6 +829,12 @@
       } finally {
         setImportLoading(false);
       }
+    });
+  }
+
+  if (els.syncRemindersBtn) {
+    els.syncRemindersBtn.addEventListener("click", async () => {
+      await syncRemindersFromExport({ silent: false });
     });
   }
 
@@ -715,4 +982,7 @@
 
   tasks = loadTasks();
   render();
+  updateRemindersSyncMeta();
+  scheduleRemindersAutoSync();
+  syncRemindersFromExport({ silent: true });
 })();
